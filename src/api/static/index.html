@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hybrid AI Recommender</title>
+    <!-- Modern Font -->
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/static/style.css">
+    <!-- Phosphor Icons for UI -->
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+</head>
+<body>
+    <div class="background-globes">
+        <div class="globe globe-1"></div>
+        <div class="globe globe-2"></div>
+    </div>
+
+    <main class="container">
+        <header>
+            <h1>Hybrid AI <span class="gradient-text">Recommender</span></h1>
+            <p>SentenceTransformers • LightGBM • RLHF • LangChain</p>
+        </header>
+
+        <section class="search-section">
+            <form id="search-form" class="search-box">
+                <i class="ph ph-magnifying-glass search-icon"></i>
+                <input type="text" id="query-input" placeholder="e.g., 'Looking for a warm, waterproof winter jacket for a skiing trip'" required autocomplete="off">
+                <button type="submit" id="search-btn">
+                    <span>Search</span>
+                    <i class="ph ph-arrow-right"></i>
+                </button>
+            </form>
+            
+            <div class="filter-pills">
+                <span class="filter-label">Inject Context:</span>
+                <button type="button" class="pill active" data-season="unknown">Any Season</button>
+                <button type="button" class="pill" data-season="winter">Winter</button>
+                <button type="button" class="pill" data-season="summer">Summer</button>
+                <button type="button" class="pill" data-season="autumn">Autumn</button>
+            </div>
+        </section>
+
+        <!-- Loader -->
+        <div id="loader" class="loader hidden">
+            <div class="spinner"></div>
+            <p>Retrieving and Re-ranking 10,000+ items...</p>
+        </div>
+
+        <!-- Results Timeline -->
+        <section id="results-container" class="results-grid"></section>
+
+        <!-- Zero State -->
+        <div id="empty-state" class="empty-state">
+            <i class="ph-duotone ph-sparkle"></i>
+            <h3>Discover Products intelligently</h3>
+            <p>Search using natural language to test the pipeline.</p>
+        </div>
+    </main>
+
+    <!-- Template for a single product card -->
+    <template id="product-card-template">
+        <article class="product-card">
+            <div class="card-glass">
+                <div class="card-header">
+                    <span class="badge rank-badge">Rank #<span></span></span>
+                    <span class="badge semantic-badge"><i class="ph-fill ph-target"></i> <span></span>% Semantic Match</span>
+                </div>
+                
+                <h3 class="product-title"></h3>
+                <span class="product-group"></span>
+                <p class="product-desc"></p>
+                
+                <div class="llm-explanation">
+                    <div class="llm-header">
+                        <i class="ph-fill ph-robot"></i> AI Stylist Reasoning
+                    </div>
+                    <p class="explanation-text"></p>
+                </div>
+            </div>
+        </article>
+    </template>
+
+    <!-- Toast Notification -->
+    <div id="toast" class="toast hidden">
+        <i class="ph-fill ph-check-circle"></i>
+        <span id="toast-msg">Feedback Logged!</span>
+    </div>
+
+    <script src="/static/app.js"></script>
+</body>
+</html>
