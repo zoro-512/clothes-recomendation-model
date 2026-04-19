@@ -29,7 +29,10 @@ body {
 /* Background Gradients */
 .background-globes {
     position: fixed;
-    top: 0; left: 0; width: 100vw; height: 100vh;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
     overflow: hidden;
     z-index: -1;
     pointer-events: none;
@@ -43,12 +46,18 @@ body {
 }
 
 .globe-1 {
-    top: -20%; left: -10%; width: 50vw; height: 50vw;
+    top: -20%;
+    left: -10%;
+    width: 50vw;
+    height: 50vw;
     background: radial-gradient(circle, var(--accent) 0%, transparent 70%);
 }
 
 .globe-2 {
-    bottom: -20%; right: -10%; width: 60vw; height: 60vw;
+    bottom: -20%;
+    right: -10%;
+    width: 60vw;
+    height: 60vw;
     background: radial-gradient(circle, #8b5cf6 0%, transparent 70%);
 }
 
@@ -96,13 +105,13 @@ header p {
     backdrop-filter: blur(12px);
     border-radius: 100px;
     padding: 8px 8px 8px 24px;
-    box-shadow: 0 4px 24px rgba(0,0,0,0.2);
+    box-shadow: 0 4px 24px rgba(0, 0, 0, 0.2);
     transition: all 0.3s ease;
 }
 
 .search-box:focus-within {
     border-color: var(--accent);
-    box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.2), 0 4px 24px rgba(0,0,0,0.3);
+    box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.2), 0 4px 24px rgba(0, 0, 0, 0.3);
 }
 
 .search-icon {
@@ -195,7 +204,10 @@ header p {
 }
 
 @keyframes fadeInUp {
-    to { opacity: 1; transform: translateY(0); }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
 }
 
 .card-glass {
@@ -326,6 +338,41 @@ header p {
     background: #e2e8f0;
 }
 
+/* Card Footer & Shop Now Button */
+.card-footer {
+    border-top: 1px solid var(--card-border);
+    margin-top: 24px;
+    padding-top: 20px;
+    display: flex;
+    justify-content: flex-end;
+}
+
+.shop-now-btn {
+    background: linear-gradient(135deg, #ff3f6c, #ff527b);
+    color: white !important;
+    text-decoration: none;
+    padding: 10px 24px;
+    border-radius: 100px;
+    font-weight: 700;
+    font-size: 0.95rem;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    box-shadow: 0 4px 15px rgba(255, 63, 108, 0.3);
+    transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+    letter-spacing: 0.5px;
+}
+
+.shop-now-btn:hover {
+    transform: translateY(-3px) scale(1.04);
+    box-shadow: 0 8px 25px rgba(255, 63, 108, 0.5);
+    filter: brightness(1.1);
+}
+
+.shop-now-btn i {
+    font-size: 1.2rem;
+}
+
 /* Loader & Empty State */
 .empty-state {
     text-align: center;
@@ -354,9 +401,15 @@ header p {
     margin: 0 auto 16px;
 }
 
-@keyframes spin { 100% { transform: rotate(360deg); } }
+@keyframes spin {
+    100% {
+        transform: rotate(360deg);
+    }
+}
 
-.hidden { display: none !important; }
+.hidden {
+    display: none !important;
+}
 
 /* Toast */
 .toast {
@@ -378,6 +431,13 @@ header p {
 }
 
 @keyframes slideUp {
-    from { bottom: -50px; opacity: 0; }
-    to { bottom: 30px; opacity: 1; }
+    from {
+        bottom: -50px;
+        opacity: 0;
+    }
+
+    to {
+        bottom: 30px;
+        opacity: 1;
+    }
 }

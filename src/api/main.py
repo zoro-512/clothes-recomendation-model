@@ -100,12 +100,21 @@ def recommend(req: RecommendationRequest):
     # 1. Parse intent
     context = parse_natural_query(query, app_state["llm_chain"], app_state["llm_mode"])
     season = req.season or context.get("season", "unknown")
+    gender = req.gender or "all"
 
     # 2. Retrieval — semantic vector search
     query_vec = generate_query_embedding(query, app_state["embedding_model"])
-    candidates = app_state["vector_store"].search(query_vec, top_k=100)
+    candidates = app_state["vector_store"].search(query_vec, top_k=200) # Get more candidates to allow for filtering
 
-    # 3. Inject RLHF rewards into candidates
+    # 3. Apply Gender Filter (Hard Filter for UI Buttons)
+    if gender == "men":
+        candidates = candidates[candidates["index_group_name"] == "Menswear"].copy()
+    elif gender == "women":
+        candidates = candidates[candidates["index_group_name"] == "Ladieswear"].copy()
+    
+    candidates = candidates.head(100) # Limit back to 100 for ranking
+
+    # 4. Inject RLHF rewards into candidates
     rewards = get_rlhf_rewards()
     candidates["article_id"] = candidates["article_id"].astype(str)
     rewards["article_id"] = rewards["article_id"].astype(str)
@@ -121,7 +130,7 @@ def recommend(req: RecommendationRequest):
             user_profile = matched.iloc[0]
 
     featured_candidates, feature_cols = build_ranking_features(
-        candidates, user_profile, {"season": season}
+        candidates, user_profile, {"season": season, "gender": gender}
     )
 
     if app_state["ranker"] is not None:
@@ -140,6 +149,7 @@ def recommend(req: RecommendationRequest):
             item_name=str(row.get("prod_name", "")),
             item_desc=str(row.get("detail_desc", ""))[:300],
             season=season,
+            gender=gender,
             chain=app_state["llm_chain"],
             mode=app_state["llm_mode"],
         )
@@ -148,6 +158,8 @@ def recommend(req: RecommendationRequest):
                 article_id=str(row["article_id"]),
                 product_name=str(row.get("prod_name", "Unknown")),
                 product_group=str(row.get("product_group_name", "")),
+                product_type=str(row.get("product_type_name", "")),
+                gender_category=str(row.get("index_group_name", "")),
                 description=str(row.get("detail_desc", ""))[:200],
                 rank_score=float(row.get("rank_score", row.get("semantic_score", 0))),
                 semantic_score=float(row["semantic_score"]),

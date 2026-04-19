@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -10,6 +11,7 @@
     <!-- Phosphor Icons for UI -->
     <script src="https://unpkg.com/@phosphor-icons/web"></script>
 </head>
+
 <body>
     <div class="background-globes">
         <div class="globe globe-1"></div>
@@ -25,19 +27,28 @@
         <section class="search-section">
             <form id="search-form" class="search-box">
                 <i class="ph ph-magnifying-glass search-icon"></i>
-                <input type="text" id="query-input" placeholder="e.g., 'Looking for a warm, waterproof winter jacket for a skiing trip'" required autocomplete="off">
+                <input type="text" id="query-input"
+                    placeholder="e.g., 'Looking for a warm, waterproof winter jacket for a skiing trip'" required
+                    autocomplete="off">
                 <button type="submit" id="search-btn">
                     <span>Search</span>
                     <i class="ph ph-arrow-right"></i>
                 </button>
             </form>
-            
+
             <div class="filter-pills">
-                <span class="filter-label">Inject Context:</span>
-                <button type="button" class="pill active" data-season="unknown">Any Season</button>
-                <button type="button" class="pill" data-season="winter">Winter</button>
-                <button type="button" class="pill" data-season="summer">Summer</button>
-                <button type="button" class="pill" data-season="autumn">Autumn</button>
+                <span class="filter-label">Season:</span>
+                <button type="button" class="pill season-pill active" data-season="unknown">Any</button>
+                <button type="button" class="pill season-pill" data-season="winter">Winter</button>
+                <button type="button" class="pill season-pill" data-season="summer">Summer</button>
+                <button type="button" class="pill season-pill" data-season="autumn">Autumn</button>
+            </div>
+
+            <div class="filter-pills">
+                <span class="filter-label">Gender:</span>
+                <button type="button" class="pill gender-pill active" data-gender="all">All</button>
+                <button type="button" class="pill gender-pill" data-gender="men">Men</button>
+                <button type="button" class="pill gender-pill" data-gender="women">Women</button>
             </div>
         </section>
 
@@ -64,18 +75,26 @@
             <div class="card-glass">
                 <div class="card-header">
                     <span class="badge rank-badge">Rank #<span></span></span>
-                    <span class="badge semantic-badge"><i class="ph-fill ph-target"></i> <span></span>% Semantic Match</span>
+                    <span class="badge semantic-badge"><i class="ph-fill ph-target"></i> <span></span>% Semantic
+                        Match</span>
                 </div>
-                
+
                 <h3 class="product-title"></h3>
                 <span class="product-group"></span>
                 <p class="product-desc"></p>
-                
+
                 <div class="llm-explanation">
                     <div class="llm-header">
                         <i class="ph-fill ph-robot"></i> AI Stylist Reasoning
                     </div>
                     <p class="explanation-text"></p>
+                </div>
+
+                <div class="card-footer">
+                    <a href="#" target="_blank" class="shop-now-btn">
+                        <span>Shop Now</span>
+                        <i class="ph ph-shopping-bag"></i>
+                    </a>
                 </div>
             </div>
         </article>
@@ -89,4 +108,5 @@
 
     <script src="/static/app.js"></script>
 </body>
+
 </html>

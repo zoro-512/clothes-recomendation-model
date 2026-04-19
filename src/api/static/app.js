@@ -5,16 +5,27 @@ document.addEventListener('DOMContentLoaded', () => {
     const template = document.getElementById('product-card-template');
     const loader = document.getElementById('loader');
     const emptyState = document.getElementById('empty-state');
-    const filterPills = document.querySelectorAll('.pill');
+    const seasonPills = document.querySelectorAll('.season-pill');
+    const genderPills = document.querySelectorAll('.gender-pill');
 
     let currentSeason = 'unknown';
+    let currentGender = 'all';
 
-    // Handle Context Pills
-    filterPills.forEach(pill => {
+    // Handle Season Pills
+    seasonPills.forEach(pill => {
         pill.addEventListener('click', () => {
-            filterPills.forEach(p => p.classList.remove('active'));
+            seasonPills.forEach(p => p.classList.remove('active'));
             pill.classList.add('active');
             currentSeason = pill.dataset.season;
+        });
+    });
+
+    // Handle Gender Pills
+    genderPills.forEach(pill => {
+        pill.addEventListener('click', () => {
+            genderPills.forEach(p => p.classList.remove('active'));
+            pill.classList.add('active');
+            currentGender = pill.dataset.gender;
         });
     });
 
@@ -37,7 +48,8 @@ document.addEventListener('DOMContentLoaded', () => {
                     query: query,
                     user_id: 'USER_001', // Mock user for demo
                     top_k: 5,
-                    season: currentSeason
+                    season: currentSeason,
+                    gender: currentGender
                 })
             });
 
@@ -76,6 +88,31 @@ document.addEventListener('DOMContentLoaded', () => {
             } else {
                 clone.querySelector('.llm-explanation').style.display = 'none';
             }
+
+            // Construct Myntra Link: https://www.myntra.com/men-{desc-words}-hnm
+            let genderTerm = 'unisex';
+            if (item.gender_category) {
+                const cat = item.gender_category.toLowerCase();
+                if (cat.includes('menswear')) genderTerm = 'men';
+                else if (cat.includes('ladieswear')) genderTerm = 'women';
+                else if (cat.includes('children') || cat.includes('baby')) genderTerm = 'kids';
+            } else if (currentGender !== 'all') {
+                genderTerm = currentGender;
+            }
+
+            // Take first 3 words from description, lowercase, strip non-alphanumeric
+            const desc = item.description || item.product_name || '';
+            const descWords = desc
+                .trim()
+                .split(/\s+/)
+                .slice(0, 3)
+                .map(w => w.toLowerCase().replace(/[^a-z0-9]/g, ''))
+                .filter(w => w.length > 0)
+                .join('-');
+
+            const pathSegment = [genderTerm, descWords, 'hnm'].filter(Boolean).join('-');
+            const myntraUrl = `https://www.myntra.com/${pathSegment}`;
+            clone.querySelector('.shop-now-btn').href = myntraUrl;
 
             // Stagger animation delay
             const card = clone.querySelector('.product-card');

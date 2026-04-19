@@ -28,7 +28,7 @@ def build_explanation_chain():
             "Customer Request: {query}\n"
             "Recommended Item: {item_name}\n"
             "Item Details: {item_desc}\n"
-            "Customer's Favourite Season: {season}\n\n"
+            "Context - Season: {season}, Gender Interest: {gender}\n\n"
             "You are a personal AI fashion stylist. In exactly one warm, engaging sentence, "
             "explain why this specific item is perfect for the customer's request."
         )
@@ -45,6 +45,7 @@ def explain_recommendation(
     item_name: str,
     item_desc: str,
     season: str = "unknown",
+    gender: str = "all",
     chain=None,
     mode: str = "fallback",
 ) -> str:
@@ -70,6 +71,7 @@ def explain_recommendation(
                     "item_name": item_name,
                     "item_desc": item_desc,
                     "season": season,
+                    "gender": gender,
                 }
             )
             return result.content.strip()

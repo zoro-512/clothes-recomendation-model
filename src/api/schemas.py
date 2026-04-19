@@ -11,12 +11,15 @@ class RecommendationRequest(BaseModel):
     user_id: Optional[str] = Field(None, example="USER_001")
     top_k: int = Field(5, ge=1, le=20, description="Number of recommendations to return")
     season: Optional[str] = Field(None, example="winter")
+    gender: Optional[str] = Field(None, example="men")
 
 
 class RecommendedItem(BaseModel):
     article_id: str
     product_name: str
     product_group: Optional[str]
+    product_type: Optional[str]
+    gender_category: Optional[str]
     description: Optional[str]
     rank_score: float
     semantic_score: float
