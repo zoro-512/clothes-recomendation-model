@@ -23,6 +23,7 @@ class RecommendedItem(BaseModel):
     description: Optional[str]
     rank_score: float
     semantic_score: float
+    product_url: Optional[str] = None
     explanation: str
 
 

@@ -6,6 +6,7 @@ Loads and validates the Amazon & H&M sampled datasets from data/raw/.
 import os
 import pandas as pd
 import numpy as np
+import re
 
 
 DATA_DIR = os.path.join(os.path.dirname(__file__), "..", "..", "data", "raw")
@@ -32,6 +33,91 @@ def load_amazon_data(sample: int = 1_000_000) -> pd.DataFrame:
 
     print(f"[Amazon] Train: {train_df.shape} | Test: {test_df.shape}")
     return train_df, test_df
+
+
+def load_myntra_data(sample: int = 100_000) -> pd.DataFrame:
+    """Load and preprocess the Myntra fashion dataset."""
+    import re  # Import re module for regex operations
+    
+    myntra_path = os.path.join(DATA_DIR, "Myntra Fasion Clothing.csv", "Myntra Fasion Clothing.csv")
+    
+    if not os.path.exists(myntra_path):
+        raise FileNotFoundError(f"Myntra dataset not found at {myntra_path}")
+    
+    # Load dataset with proper handling
+    df = pd.read_csv(myntra_path, low_memory=False)
+    
+    # Sample if too large
+    if len(df) > sample:
+        df = df.sample(sample, random_state=42).reset_index(drop=True)
+    
+    # Map Myntra columns to H&M compatible names
+    df = df.rename(columns={
+        'URL': 'product_url',
+        'Product_id': 'article_id',
+        'BrandName': 'brand_name',
+        'Category': 'product_group_name',
+        'Individual_category': 'product_type_name',
+        'category_by_Gender': 'index_group_name',
+        'Description': 'detail_desc',
+        'DiscountPrice (in Rs)': 'price',
+        'OriginalPrice (in Rs)': 'original_price',
+        'DiscountOffer': 'discount_offer',
+        'SizeOption': 'size_options',
+        'Ratings': 'ratings',
+        'Reviews': 'reviews'
+    })
+    
+    # Create product_name from brand and category
+    df['prod_name'] = df['brand_name'] + ' ' + df['product_type_name']
+    
+    # Create color information (simplified to avoid pandas issues)
+    df['colour_group_name'] = 'Multi'
+    df['perceived_colour_value_name'] = 'multi'
+    
+    # Try to extract colors from descriptions if available
+    if 'detail_desc' in df.columns:
+        color_pattern = r'(black|white|blue|red|green|grey|navy|maroon|beige|brown|olive|khaki|cream|pink|purple|yellow|orange|teal)'
+        colors = []
+        for desc in df['detail_desc'].fillna(''):
+            if isinstance(desc, str):
+                match = re.search(color_pattern, desc, flags=re.IGNORECASE)
+                if match:
+                    colors.append(match.group().title())
+                else:
+                    colors.append('Multi')
+            else:
+                colors.append('Multi')
+        df['colour_group_name'] = colors
+        df['perceived_colour_value_name'] = [c.lower() for c in colors]
+    
+    # Create additional H&M compatible columns
+    df['product_code'] = df['article_id'].astype(str)
+    df['index_code'] = df['article_id'].astype(str)
+    df['index_name'] = df['product_type_name']
+    df['department_name'] = df['product_group_name']
+    df['section_name'] = df['product_type_name']
+    df['garment_group_name'] = df['product_group_name']
+    df['graphical_appearance_name'] = df['brand_name']
+    df['perceived_colour_master_name'] = df['colour_group_name']
+    
+    # Fill missing values
+    df['detail_desc'] = df['detail_desc'].fillna(df['prod_name'])
+    df['prod_name'] = df['prod_name'].fillna("Unknown Product")
+    df['price'] = df['price'].fillna(df['original_price']).fillna(999.0)
+    
+    # Create semantic text for embeddings
+    df['semantic_text'] = (
+        df['prod_name'] + " | " + 
+        df['product_group_name'].fillna("") + " | " + 
+        df['detail_desc']
+    )
+    
+    # Create purchase_count (simulate popularity based on ratings and reviews)
+    df['purchase_count'] = ((df['ratings'].fillna(3.0) * 100) + (df['reviews'].fillna(0) * 10)).astype(int)
+    
+    print(f"[Myntra] Loaded {df.shape} products")
+    return df
 
 
 def load_hm_data() -> tuple[pd.DataFrame, pd.DataFrame]:

@@ -89,29 +89,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 clone.querySelector('.llm-explanation').style.display = 'none';
             }
 
-            // Construct Myntra Link: https://www.myntra.com/men-{desc-words}-hnm
-            let genderTerm = 'unisex';
-            if (item.gender_category) {
-                const cat = item.gender_category.toLowerCase();
-                if (cat.includes('menswear')) genderTerm = 'men';
-                else if (cat.includes('ladieswear')) genderTerm = 'women';
-                else if (cat.includes('children') || cat.includes('baby')) genderTerm = 'kids';
-            } else if (currentGender !== 'all') {
-                genderTerm = currentGender;
-            }
-
-            // Take first 3 words from description, lowercase, strip non-alphanumeric
-            const desc = item.description || item.product_name || '';
-            const descWords = desc
-                .trim()
-                .split(/\s+/)
-                .slice(0, 3)
-                .map(w => w.toLowerCase().replace(/[^a-z0-9]/g, ''))
-                .filter(w => w.length > 0)
-                .join('-');
-
-            const pathSegment = [genderTerm, descWords, 'hnm'].filter(Boolean).join('-');
-            const myntraUrl = `https://www.myntra.com/${pathSegment}`;
+            // Use real product URL from API response
+            const myntraUrl = item.product_url || '#';
             clone.querySelector('.shop-now-btn').href = myntraUrl;
 
             // Stagger animation delay

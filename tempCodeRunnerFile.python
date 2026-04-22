@@ -1,0 +1,16 @@
+S = sparameters('11cp mimo.s4p');
+freq = S.Frequencies;
+data = S.Parameters;
+
+for k = 1:length(freq)
+    Sk = data(:,:,k);
+    num = 0;
+    for i = 1:4
+        val = sum(Sk(i,:));
+        num = num + abs(val)^2;
+    end
+    tarc(k) = sqrt(num)/2;
+end
+
+plot(freq/1e9, 20*log10(tarc))
+xlabel('GHz'); ylabel('TARC (dB)')

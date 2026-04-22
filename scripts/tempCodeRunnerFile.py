@@ -1,1 +1,1 @@
-C:\\venvs\\recom\\Scripts\\python -m uvicorn src.api.main:app --host 0.0.0.0 --port 8000
+"C:\\venvs\\recom\\Scripts\\python -m uvicorn src.api.main:app --host 0.0.0.0 --port 8000
