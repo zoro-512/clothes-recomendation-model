@@ -12,6 +12,10 @@ class RecommendationRequest(BaseModel):
     top_k: int = Field(5, ge=1, le=20, description="Number of recommendations to return")
     season: Optional[str] = Field(None, example="winter")
     gender: Optional[str] = Field(None, example="men")
+    min_price: Optional[float] = Field(None, example=500.0, description="Minimum price filter")
+    max_price: Optional[float] = Field(None, example=2000.0, description="Maximum price filter")
+    brand: Optional[str] = Field(None, example="Nike", description="Single brand filter (legacy)")
+    brands: Optional[List[str]] = Field(None, example=["Nike", "Adidas"], description="Multiple brand filter")
 
 
 class RecommendedItem(BaseModel):
@@ -21,6 +25,8 @@ class RecommendedItem(BaseModel):
     product_type: Optional[str]
     gender_category: Optional[str]
     description: Optional[str]
+    price: Optional[float] = None
+    original_price: Optional[float] = None
     rank_score: float
     semantic_score: float
     product_url: Optional[str] = None
@@ -31,6 +37,7 @@ class RecommendationResponse(BaseModel):
     query: str
     user_id: Optional[str]
     recommendations: List[RecommendedItem]
+    is_fallback: bool = False
     total_candidates_evaluated: int
 
 

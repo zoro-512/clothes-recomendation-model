@@ -250,9 +250,37 @@ header p {
     color: var(--secondary-accent);
 }
 
+.title-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 16px;
+    margin-bottom: 4px;
+}
+
 .product-title {
     font-size: 1.5rem;
-    margin-bottom: 4px;
+    line-height: 1.2;
+}
+
+.product-price {
+    font-size: 1.4rem;
+    font-weight: 800;
+    color: var(--secondary-accent);
+    white-space: nowrap;
+}
+
+.original-price {
+    font-size: 0.9rem;
+    font-weight: 400;
+    color: var(--text-secondary);
+    text-decoration: line-through;
+    margin-left: 8px;
+    opacity: 0.7;
+}
+
+.current-price {
+    color: var(--secondary-accent);
 }
 
 .product-group {
@@ -407,6 +435,24 @@ header p {
     }
 }
 
+.fallback-warning {
+    background: rgba(245, 158, 11, 0.1);
+    border: 1px solid rgba(245, 158, 11, 0.3);
+    color: #f59e0b;
+    padding: 16px 24px;
+    border-radius: 12px;
+    margin-bottom: 24px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-weight: 500;
+    backdrop-filter: blur(10px);
+}
+
+.fallback-warning i {
+    font-size: 1.5rem;
+}
+
 .hidden {
     display: none !important;
 }
@@ -439,5 +485,147 @@ header p {
     to {
         bottom: 30px;
         opacity: 1;
+    }
+}
+
+/* Price Range and Brand Filter Styles */
+.filter-row {
+    display: flex;
+    gap: 32px;
+    margin-top: 16px;
+    flex-wrap: wrap;
+}
+
+.filter-group {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.filter-label {
+    font-size: 14px;
+    color: var(--text-secondary);
+    font-weight: 500;
+    min-width: 80px;
+}
+
+.price-range-container {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.price-range-container input[type="number"] {
+    width: 100px;
+    padding: 8px 12px;
+    background: var(--card-bg);
+    border: 1px solid var(--card-border);
+    border-radius: var(--radius-md);
+    color: var(--text-primary);
+    font-size: 14px;
+    font-family: 'Outfit', sans-serif;
+    transition: all 0.2s ease;
+}
+
+.price-range-container input[type="number"]:focus {
+    outline: none;
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px var(--accent-glow);
+}
+
+.price-range-container input[type="number"]::placeholder {
+    color: var(--text-secondary);
+    opacity: 0.6;
+}
+
+.price-range-container span {
+    color: var(--text-secondary);
+    font-weight: 500;
+}
+
+.brand-select {
+    padding: 8px 12px;
+    background: var(--card-bg);
+    border: 1px solid var(--card-border);
+    border-radius: var(--radius-md);
+    color: var(--text-primary);
+    font-size: 14px;
+    font-family: 'Outfit', sans-serif;
+    min-width: 150px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.brand-select:focus {
+    outline: none;
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px var(--accent-glow);
+}
+
+.brand-select option {
+    background: var(--bg-dark);
+    color: var(--text-primary);
+}
+
+.brand-filter-wrapper {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    flex: 1;
+}
+
+.selected-brands-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.brand-tag {
+    background: var(--accent);
+    color: white;
+    padding: 4px 12px;
+    border-radius: 100px;
+    font-size: 0.8rem;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-weight: 600;
+}
+
+.brand-tag i {
+    cursor: pointer;
+    font-size: 1rem;
+    transition: transform 0.2s;
+}
+
+.brand-tag i:hover {
+    transform: scale(1.2);
+    color: #fee2e2;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+    .filter-row {
+        flex-direction: column;
+        gap: 16px;
+    }
+    
+    .filter-group {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 8px;
+    }
+    
+    .filter-label {
+        min-width: auto;
+    }
+    
+    .price-range-container input[type="number"] {
+        width: 120px;
+    }
+    
+    .brand-select {
+        width: 100%;
+        min-width: auto;
     }
 }

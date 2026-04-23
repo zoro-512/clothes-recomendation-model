@@ -101,6 +101,10 @@ def load_myntra_data(sample: int = 100_000) -> pd.DataFrame:
     df['graphical_appearance_name'] = df['brand_name']
     df['perceived_colour_master_name'] = df['colour_group_name']
     
+    # Ensure price columns are numeric
+    df['price'] = pd.to_numeric(df['price'], errors='coerce')
+    df['original_price'] = pd.to_numeric(df['original_price'], errors='coerce')
+    
     # Fill missing values
     df['detail_desc'] = df['detail_desc'].fillna(df['prod_name'])
     df['prod_name'] = df['prod_name'].fillna("Unknown Product")
@@ -137,6 +141,10 @@ def load_hm_data() -> tuple[pd.DataFrame, pd.DataFrame]:
     articles = pd.read_csv(articles_path)
     transactions = pd.read_csv(txn_path)
 
+    # Standardise column names (sampled data might have 'C' instead of 'article_id')
+    if "C" in articles.columns and "article_id" not in articles.columns:
+        articles = articles.rename(columns={"C": "article_id"})
+
     # Fill missing descriptions
     articles["detail_desc"] = articles["detail_desc"].fillna("")
     articles["prod_name"] = articles["prod_name"].fillna("")
@@ -155,14 +163,16 @@ def load_hm_data() -> tuple[pd.DataFrame, pd.DataFrame]:
     transactions["month"] = transactions["t_dat"].dt.month
     transactions["season"] = transactions["month"].apply(_month_to_season)
 
-    # Compute item popularity
-    popularity = (
+    # Compute item popularity and average price
+    item_stats = (
         transactions.groupby("article_id")
-        .size()
-        .rename("purchase_count")
+        .agg(
+            purchase_count=("article_id", "size"),
+            price=("price", "mean")
+        )
         .reset_index()
     )
-    articles = articles.merge(popularity, on="article_id", how="left")
+    articles = articles.merge(item_stats, on="article_id", how="left")
     articles["purchase_count"] = articles["purchase_count"].fillna(0).astype(int)
 
     print(f"[H&M] Articles: {articles.shape} | Transactions: {transactions.shape}")

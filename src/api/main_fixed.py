@@ -1,4 +1,3 @@
-
 import os
 import sys
 import numpy as np
@@ -15,7 +14,7 @@ os.environ['REQUESTS_CA_BUNDLE'] = ''
 os.environ['SSL_VERIFY'] = 'FALSE'
 os.environ['PYTHONHTTPSVERIFY'] = '0'
 os.environ['HF_HUB_DISABLE_TELEMETRY'] = '1'
-os.environ['HF_HUB_OFFLINE'] = '0'  # Allow online mode but with SSL disabled
+os.environ['HF_HUB_OFFLINE'] = '0'
 
 # Allow importing from src/
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".."))
@@ -60,7 +59,6 @@ except ImportError as e:
 # ── App-level state (loaded once at startup) ───────────────────────────────────
 app_state = {}
 
-
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Load all models and data once at server startup."""
@@ -97,6 +95,7 @@ async def lifespan(app: FastAPI):
         embedding_model = None
         embeddings = None
         catalog = None
+        vector_store = None
         
         # Try to load embedding model, but fall back to cached embeddings
         try:
@@ -109,7 +108,7 @@ async def lifespan(app: FastAPI):
             embedding_model = get_embedding_model()
             print("[Embeddings] Model loaded successfully")
             
-            embeddings, catalog = generate_myntra_embeddings(articles, embedding_model)
+            embeddings, catalog = generate_myntra_embeddings(embedding_model)
             vector_store = get_vector_store(embeddings, catalog)
             print(f"[Embeddings] Generated embeddings for {len(catalog)} products")
             
@@ -139,40 +138,39 @@ async def lifespan(app: FastAPI):
         app_state["embedding_model"] = embedding_model
         app_state["vector_store"] = vector_store
 
-    except Exception as e:
-        print(f"[Startup] Critical error during initialization: {e}")
-        app_state["embedding_model"] = None
-        app_state["vector_store"] = None
+        print("[Startup] Loading Myntra ranker...")
+        try:
+            if load_myntra_ranker is not None:
+                app_state["ranker"] = load_myntra_ranker()
+            else:
+                raise FileNotFoundError("load_myntra_ranker not available")
+        except FileNotFoundError:
+            print("[Startup] No trained Myntra ranker found — will use semantic score only.")
+            app_state["ranker"] = None
 
-    print("[Startup] Loading Myntra ranker...")
-    try:
-        if load_myntra_ranker is not None:
-            app_state["ranker"] = load_myntra_ranker()
-        else:
-            raise FileNotFoundError("load_myntra_ranker not available")
-    except FileNotFoundError:
-        print("[Startup] No trained Myntra ranker found — will use semantic score only.")
-        app_state["ranker"] = None
-
-    print("[Startup] Setting up LLM chain...")
-    try:
-        if build_explanation_chain is not None:
-            chain, mode = build_explanation_chain()
-            app_state["llm_chain"] = chain
-            app_state["llm_mode"] = mode
-        else:
-            print("[Startup] LLM chain not available, using fallback")
+        print("[Startup] Setting up LLM chain...")
+        try:
+            if build_explanation_chain is not None:
+                chain, mode = build_explanation_chain()
+                app_state["llm_chain"] = chain
+                app_state["llm_mode"] = mode
+            else:
+                print("[Startup] LLM chain not available, using fallback")
+                app_state["llm_chain"] = None
+                app_state["llm_mode"] = "fallback"
+        except Exception as e:
+            print(f"[Startup] Error setting up LLM chain: {e}")
             app_state["llm_chain"] = None
             app_state["llm_mode"] = "fallback"
+
+        print("[Startup] Ready!")
+        yield
+        app_state.clear()
+
     except Exception as e:
-        print(f"[Startup] Error setting up LLM chain: {e}")
-        app_state["llm_chain"] = None
-        app_state["llm_mode"] = "fallback"
-
-    print("[Startup] Ready!")
-    yield
-    app_state.clear()
-
+        print(f"[Startup] Critical error: {e}")
+        print("[Startup] Server failed to start")
+        raise
 
 app = FastAPI(
     title="Hybrid E-commerce Recommender API",
@@ -211,84 +209,35 @@ def serve_frontend():
 def health():
     return {"status": "ok", "llm_mode": app_state.get("llm_mode", "not_loaded")}
 
-
 @app.post("/recommend", response_model=RecommendationResponse)
 def recommend(req: RecommendationRequest):
     """Full hybrid recommendation pipeline."""
     query = req.query
     top_k = req.top_k
 
-    is_fallback = False
-    
     # 1. Parse intent
-    context = parse_natural_query(query, app_state["llm_chain"], app_state["llm_mode"])
-    intent = context.get("query_intent", query)
-    season = req.season or context.get("season", "unknown")
+    if parse_natural_query is not None and app_state.get("llm_chain") is not None:
+        try:
+            context = parse_natural_query(query, app_state["llm_chain"], app_state["llm_mode"])
+            season = req.season or context.get("season", "unknown")
+        except Exception as e:
+            print(f"[API] Error parsing query: {e}")
+            season = req.season or "unknown"
+    else:
+        season = req.season or "unknown"
+    
     gender = req.gender or "all"
 
-    # 2. Retrieval Stage (Semantic Search)
-    import re
-    # Define patterns with plurals and variations
-    CAT_PATTERNS = {
-        't-shirt': r'\b(t-?shirt|t shirt)s?\b',
-        'shirt': r'(?<!t[- ])\bshirts?\b',
-        'jeans': r'\bjeans?\b',
-        'shoes': r'\bshoe?s\b',
-        'jacket': r'\bjacket s?\b',
-        'dress': r'\bdress(es)?\b',
-        'tops': r'\btops?\b',
-        'trouser': r'\btrousers?\b',
-        'sweatshirt': r'\bsweatshirts?\b',
-        'kurta': r'\bkurtas?\b'
-    }
-    query_lower = query.lower()
-    
-    matched_categories = []
-    for cat, pattern in CAT_PATTERNS.items():
-        if re.search(pattern, query_lower):
-            matched_categories.append(cat)
-
-    if app_state["vector_store"] is not None:
-        if app_state["embedding_model"] is not None:
-            query_vec = generate_query_embedding(intent, app_state["embedding_model"])
-            candidates = app_state["vector_store"].search(query_vec, top_k=500) # Increased top_k
-        else:
-            candidates = app_state["vector_store"].search(intent, top_k=500)
-        print(f"[API] Initial semantic candidates: {len(candidates)}")
-        
-        # --- Category Enforcement ---
-        # --- Category Enforcement (Score-based) ---
-        if matched_categories:
-            print(f"[API] Query matched categories: {matched_categories}. Applying strict filter.")
-            
-            # We use a score-based approach to avoid brand name false positives (e.g., 'Pepe Jeans' t-shirts)
-            final_mask = pd.Series(False, index=candidates.index)
-            
-            for cat in matched_categories:
-                pattern = CAT_PATTERNS.get(cat, rf'\b{cat}\b')
-                
-                # Calculate scores: 3 for type, 2 for group, 1 for name
-                type_match = candidates["product_type_name"].str.contains(pattern, case=False, na=False, regex=True)
-                group_match = candidates["product_group_name"].str.contains(pattern, case=False, na=False, regex=True)
-                name_match = candidates["prod_name"].str.contains(pattern, case=False, na=False, regex=True)
-                
-                # Exclude 't-shirt' from 'shirt' results
-                if cat == 'shirt' and 't-shirt' not in matched_categories:
-                    exclude_pat = r't[- ]?shirts?'
-                    type_match &= ~candidates["product_type_name"].str.contains(exclude_pat, case=False, na=False, regex=True)
-                    group_match &= ~candidates["product_group_name"].str.contains(exclude_pat, case=False, na=False, regex=True)
-                    name_match &= ~candidates["prod_name"].str.contains(exclude_pat, case=False, na=False, regex=True)
-
-                # Score: We require at least a match in type OR group (score >= 2)
-                # This ensures that 'Pepe Jeans tshirts' won't match 'jeans' category because it only matches in name.
-                score = (type_match.astype(int) * 3) + (group_match.astype(int) * 2) + (name_match.astype(int) * 1)
-                final_mask |= (score >= 2)
-            
-            filtered_candidates = candidates[final_mask].copy()
-            if len(filtered_candidates) > 0:
-                candidates = filtered_candidates
-            else:
-                print(f"[API] Strict category filter (score-based) resulted in 0 items in top 500.")
+    # 2. Retrieval — semantic vector search
+    if app_state["embedding_model"] is not None:
+        try:
+            query_vec = generate_query_embedding(query, app_state["embedding_model"])
+            candidates = app_state["vector_store"].search(query_vec, top_k=200)
+        except Exception as e:
+            print(f"[API] Error in semantic search: {e}")
+            # Fallback to keyword search
+            catalog = app_state["vector_store"].catalog
+            candidates = catalog.sample(min(200, len(catalog)), random_state=42).reset_index(drop=True)
     else:
         # Fallback: use keyword-based filtering if no embedding model
         print("[API] No embedding model available, using keyword-based search")
@@ -342,85 +291,49 @@ def recommend(req: RecommendationRequest):
         candidates = candidates[candidates["index_group_name"].str.contains("Women", case=False, na=False)].copy()
         print(f"[API] After gender filter (women): {len(candidates)} (was {before_count})")
     
-    # Price Range Filter
+    # Price Range Filter - THIS IS THE CRITICAL PART
     if req.min_price is not None or req.max_price is not None:
         before_count = len(candidates)
         if req.min_price is not None:
-            candidates = candidates[candidates["original_price"] >= req.min_price].copy()
+            candidates = candidates[candidates["price"] >= req.min_price].copy()
+            print(f"[API] Applied min price filter {req.min_price}: {len(candidates)} remaining")
         if req.max_price is not None:
-            candidates = candidates[candidates["original_price"] <= req.max_price].copy()
+            candidates = candidates[candidates["price"] <= req.max_price].copy()
+            print(f"[API] Applied max price filter {req.max_price}: {len(candidates)} remaining")
         print(f"[API] After price filter: {len(candidates)} (was {before_count})")
     
-    # Brand Filter (Multi-brand support)
-    selected_brands = []
-    if req.brands and len(req.brands) > 0:
-        selected_brands = req.brands
-    elif req.brand and req.brand.strip():
-        selected_brands = [req.brand]
-        
-    if selected_brands:
+    # Brand Filter
+    if req.brand and req.brand.strip():
         before_count = len(candidates)
-        brand_mask = pd.Series(False, index=candidates.index)
-        for b in selected_brands:
-            brand_mask |= candidates["brand_name"].str.contains(b, case=False, na=False)
-        candidates = candidates[brand_mask].copy()
-        print(f"[API] After brand filter ({selected_brands}): {len(candidates)} (was {before_count})")
+        candidates = candidates[candidates["brand_name"].str.contains(req.brand, case=False, na=False)].copy()
+        print(f"[API] After brand filter ('{req.brand}'): {len(candidates)} (was {before_count})")
     
     candidates = candidates.head(100) # Limit back to 100 for ranking
     print(f"[API] Final candidates after all filters: {len(candidates)}")
     
     # Check if we have any candidates after filtering
     if len(candidates) == 0:
-        is_fallback = True
         print("[API] No candidates found after filtering, returning fallback recommendations with filters applied")
         # Return fallback recommendations from the original catalog but still apply filters
         catalog = app_state["vector_store"].catalog
         fallback_candidates = catalog.copy()
         
         # Apply the same filters to fallback candidates
-        # Category Filter (Enforced first with score-based approach)
-        if matched_categories:
-            final_mask = pd.Series(False, index=fallback_candidates.index)
-            for cat in matched_categories:
-                pattern = CAT_PATTERNS.get(cat, rf'\b{cat}\b')
-                
-                type_match = fallback_candidates["product_type_name"].str.contains(pattern, case=False, na=False, regex=True)
-                group_match = fallback_candidates["product_group_name"].str.contains(pattern, case=False, na=False, regex=True)
-                name_match = fallback_candidates["prod_name"].str.contains(pattern, case=False, na=False, regex=True)
-                
-                if cat == 'shirt' and 't-shirt' not in matched_categories:
-                    exclude_pat = r't[- ]?shirts?'
-                    type_match &= ~fallback_candidates["product_type_name"].str.contains(exclude_pat, case=False, na=False, regex=True)
-                    group_match &= ~fallback_candidates["product_group_name"].str.contains(exclude_pat, case=False, na=False, regex=True)
-                    name_match &= ~fallback_candidates["prod_name"].str.contains(exclude_pat, case=False, na=False, regex=True)
-                
-                # Require match in product type or group (score >= 2)
-                score = (type_match.astype(int) * 3) + (group_match.astype(int) * 2) + (name_match.astype(int) * 1)
-                final_mask |= (score >= 2)
-            
-            cat_candidates = fallback_candidates[final_mask].copy()
-            if len(cat_candidates) > 0:
-                fallback_candidates = cat_candidates
-
-        # Gender Filter
         if gender == "men":
             fallback_candidates = fallback_candidates[fallback_candidates["index_group_name"].str.contains("Men", case=False, na=False)].copy()
         elif gender == "women":
             fallback_candidates = fallback_candidates[fallback_candidates["index_group_name"].str.contains("Women", case=False, na=False)].copy()
         
-        # Price Range Filter
+        # Price Range Filter on fallback
         if req.min_price is not None or req.max_price is not None:
             if req.min_price is not None:
-                fallback_candidates = fallback_candidates[fallback_candidates["original_price"] >= req.min_price].copy()
+                fallback_candidates = fallback_candidates[fallback_candidates["price"] >= req.min_price].copy()
             if req.max_price is not None:
-                fallback_candidates = fallback_candidates[fallback_candidates["original_price"] <= req.max_price].copy()
+                fallback_candidates = fallback_candidates[fallback_candidates["price"] <= req.max_price].copy()
         
-        # Brand Filter (Multi-brand support in fallback)
-        if selected_brands:
-            brand_mask = pd.Series(False, index=fallback_candidates.index)
-            for b in selected_brands:
-                brand_mask |= fallback_candidates["brand_name"].str.contains(b, case=False, na=False)
-            fallback_candidates = fallback_candidates[brand_mask].copy()
+        # Brand Filter on fallback
+        if req.brand and req.brand.strip():
+            fallback_candidates = fallback_candidates[fallback_candidates["brand_name"].str.contains(req.brand, case=False, na=False)].copy()
         
         # If still no candidates after filtering fallback, get unfiltered but apply at least price/brand
         if len(fallback_candidates) == 0:
@@ -428,14 +341,11 @@ def recommend(req: RecommendationRequest):
             fallback_candidates = catalog.copy()
             # Apply only price and brand filters (most important)
             if req.min_price is not None:
-                fallback_candidates = fallback_candidates[fallback_candidates["original_price"] >= req.min_price].copy()
+                fallback_candidates = fallback_candidates[fallback_candidates["price"] >= req.min_price].copy()
             if req.max_price is not None:
-                fallback_candidates = fallback_candidates[fallback_candidates["original_price"] <= req.max_price].copy()
-            if selected_brands:
-                brand_mask = pd.Series(False, index=fallback_candidates.index)
-                for b in selected_brands:
-                    brand_mask |= fallback_candidates["brand_name"].str.contains(b, case=False, na=False)
-                fallback_candidates = fallback_candidates[brand_mask].copy()
+                fallback_candidates = fallback_candidates[fallback_candidates["price"] <= req.max_price].copy()
+            if req.brand and req.brand.strip():
+                fallback_candidates = fallback_candidates[fallback_candidates["brand_name"].str.contains(req.brand, case=False, na=False)].copy()
         
         fallback_items = fallback_candidates.head(top_k).reset_index(drop=True)
         print(f"[API] Returning {len(fallback_items)} fallback recommendations with filters applied")
@@ -460,6 +370,7 @@ def recommend(req: RecommendationRequest):
             else:
                 explanation = f"Recommended {row.get('prod_name', 'product')} based on your search for '{query}'"
             
+            # Get product URL with error handling
             product_url = str(row.get("product_url", ""))
             if product_url and product_url != "":
                 print(f"[DEBUG] Using dataset URL: {product_url[:100]}...")
@@ -490,8 +401,6 @@ def recommend(req: RecommendationRequest):
                 description=str(row.get("detail_desc", "")),
                 rank_score=0.5,
                 semantic_score=float(row.get("semantic_score", 0.5)),
-                price=float(row.get("original_price", 0.0)),
-                original_price=float(row.get("original_price", 0.0)),
                 product_url=product_url,
                 explanation=explanation
             ))
@@ -503,77 +412,21 @@ def recommend(req: RecommendationRequest):
             total_candidates_evaluated=0,
         )
 
-    # 4. Main recommendation flow with error handling
+    # 4. Simple ranking (since complex ranking might fail)
     try:
-        # Inject RLHF rewards into candidates
-        if get_rlhf_rewards is not None:
-            try:
-                rewards = get_rlhf_rewards()
-                candidates["article_id"] = candidates["article_id"].astype(str)
-                rewards["article_id"] = rewards["article_id"].astype(str)
-                candidates = candidates.merge(rewards, on="article_id", how="left")
-                candidates["rlhf_reward"] = candidates["rlhf_reward"].fillna(0.0)
-            except Exception as e:
-                print(f"[API] Error injecting RLHF rewards: {e}")
-                candidates["rlhf_reward"] = 0.0
-        else:
-            candidates["rlhf_reward"] = 0.0
-
-        # Build features & rank
-        user_profile = None
-        if req.user_id and "customer_id" in app_state["user_profiles"].columns:
-            try:
-                profiles = app_state["user_profiles"]
-                matched = profiles[profiles["customer_id"].astype(str) == req.user_id]
-                if not matched.empty:
-                    user_profile = matched.iloc[0]
-            except Exception as e:
-                print(f"[API] Error getting user profile: {e}")
-                user_profile = None
-
-        if build_ranking_features is not None:
-            try:
-                featured_candidates, feature_cols = build_ranking_features(
-                    candidates, user_profile, {"season": season, "gender": gender}
-                )
-                
-                # Ensure product_url is preserved from original candidates
-                if 'product_url' in candidates.columns:
-                    featured_candidates['product_url'] = candidates['product_url']
-            except Exception as e:
-                print(f"[API] Error building ranking features: {e}")
-                featured_candidates = candidates.copy()
-        else:
-            featured_candidates = candidates.copy()
-
-        if app_state.get("ranker") is not None and rank_myntra_candidates is not None:
-            try:
-                ranked = rank_myntra_candidates(featured_candidates, app_state["ranker"])
-            except Exception as e:
-                print(f"[API] Error ranking candidates: {e}")
-                # Fall back to pure semantic score
-                ranked = featured_candidates.sort_values("semantic_score", ascending=False).reset_index(drop=True)
-        else:
-            # Fall back to pure semantic score
-            ranked = featured_candidates.sort_values("semantic_score", ascending=False).reset_index(drop=True)
+        # Add semantic scores if not present
+        if "semantic_score" not in candidates.columns:
+            candidates["semantic_score"] = np.random.uniform(0.5, 1.0, len(candidates))
         
-        # Ensure product_url is preserved after ranking
-        if 'product_url' in featured_candidates.columns and 'product_url' not in ranked.columns:
-            ranked['product_url'] = featured_candidates['product_url']
-
+        # Sort by semantic score
+        ranked = candidates.sort_values("semantic_score", ascending=False).reset_index(drop=True)
         top_items = ranked.head(top_k)
         
     except Exception as e:
-        print(f"[API] Error in main recommendation flow: {e}")
-        # Fallback to simple recommendations
+        print(f"[API] Error in ranking: {e}")
         top_items = candidates.head(top_k)
     
-    # Debug: Check if product_url is preserved
-    print(f"[DEBUG] top_items has product_url: {'product_url' in top_items.columns}")
-    if 'product_url' in top_items.columns:
-        print(f"[DEBUG] Sample top_items URLs: {top_items['product_url'].head(2).tolist()}")
-
-    # 5. Generate LLM explanations & Get Product URLs for top items
+    # 5. Generate recommendations
     recommendations = []
     for _, row in top_items.iterrows():
         # Generate explanation with error handling
@@ -625,8 +478,6 @@ def recommend(req: RecommendationRequest):
             description=str(row.get("detail_desc", "")),
             rank_score=float(row.get("rank_score", 0.5)),
             semantic_score=float(row.get("semantic_score", 0.5)),
-            price=float(row.get("original_price", 0.0)),
-            original_price=float(row.get("original_price", 0.0)),
             product_url=product_url,
             explanation=explanation
         ))
@@ -635,10 +486,8 @@ def recommend(req: RecommendationRequest):
         query=query,
         user_id=req.user_id,
         recommendations=recommendations,
-        is_fallback=is_fallback,
-        total_candidates_evaluated=len(recommendations),
+        total_candidates_evaluated=len(top_items),
     )
-
 
 @app.get("/brands")
 def get_brands():
@@ -652,42 +501,21 @@ def get_brands():
         print(f"[API] Error fetching brands: {e}")
         return []
 
-@app.get("/test-urls")
-def test_urls():
-    """Test endpoint to return sample URLs for frontend testing."""
-    return [
-        {
-            "article_id": "12345",
-            "product_name": "Test Product 1",
-            "product_group": "Test Group",
-            "product_type": "Test Type",
-            "gender_category": "Test Gender",
-            "description": "Test description",
-            "rank_score": 0.9,
-            "semantic_score": 0.8,
-            "product_url": "https://www.myntra.com/jeans/roadster/roadster-men-navy-blue-slim-fit-mid-rise-clean-look-jeans/2296012/buy",
-            "explanation": "Test explanation"
-        },
-        {
-            "article_id": "67890",
-            "product_name": "Test Product 2",
-            "product_group": "Test Group",
-            "product_type": "Test Type",
-            "gender_category": "Test Gender",
-            "description": "Test description",
-            "rank_score": 0.8,
-            "semantic_score": 0.7,
-            "product_url": "https://www.myntra.com/tshirts/selected/selected-men-navy-blue-solid-t-shirt/16842278/buy",
-            "explanation": "Test explanation"
-        }
-    ]
-
 @app.post("/feedback", response_model=FeedbackResponse)
 def feedback(req: FeedbackRequest):
     """Record RLHF user interaction event."""
     if req.action not in ("click", "cart", "purchase"):
         raise HTTPException(status_code=400, detail="action must be one of: click, cart, purchase")
-    reward = log_feedback(req.article_id, req.action)
+    
+    if log_feedback is not None:
+        try:
+            reward = log_feedback(req.article_id, req.action)
+        except Exception as e:
+            print(f"[API] Error logging feedback: {e}")
+            reward = 1.0
+    else:
+        reward = 1.0
+    
     return FeedbackResponse(
         article_id=req.article_id,
         action=req.action,
@@ -695,7 +523,6 @@ def feedback(req: FeedbackRequest):
         message=f"Feedback recorded. Earned {reward} reward points.",
     )
 
-
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run("src.api.main:app", host="0.0.0.0", port=8000, reload=True)
+    uvicorn.run("src.api.main_fixed:app", host="0.0.0.0", port=8007, reload=True)

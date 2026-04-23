@@ -50,12 +50,38 @@
                 <button type="button" class="pill gender-pill" data-gender="men">Men</button>
                 <button type="button" class="pill gender-pill" data-gender="women">Women</button>
             </div>
+
+            <div class="filter-row">
+                <div class="filter-group">
+                    <span class="filter-label">Price Range:</span>
+                    <div class="price-range-container">
+                        <input type="number" id="min-price" placeholder="Min" min="0" step="100">
+                        <span>-</span>
+                        <input type="number" id="max-price" value="500" placeholder="Max" min="0" step="100">
+                    </div>
+                </div>
+                
+                <div class="filter-group">
+                    <span class="filter-label">Brands:</span>
+                    <div class="brand-filter-wrapper">
+                        <select id="brand-select" class="brand-select">
+                            <option value="">Add Brand...</option>
+                        </select>
+                        <div id="selected-brands-tags" class="selected-brands-tags"></div>
+                    </div>
+                </div>
+            </div>
         </section>
 
         <!-- Loader -->
         <div id="loader" class="loader hidden">
             <div class="spinner"></div>
             <p>Retrieving and Re-ranking 10,000+ items...</p>
+        </div>
+
+        <div id="fallback-warning" class="fallback-warning hidden">
+            <i class="ph-duotone ph-warning-circle"></i>
+            <span>No exact matches found for your current price/brand filters. Showing related items instead.</span>
         </div>
 
         <!-- Results Timeline -->
@@ -79,7 +105,10 @@
                         Match</span>
                 </div>
 
-                <h3 class="product-title"></h3>
+                <div class="title-row">
+                    <h3 class="product-title"></h3>
+                    <span class="product-price"></span>
+                </div>
                 <span class="product-group"></span>
                 <p class="product-desc"></p>
 
